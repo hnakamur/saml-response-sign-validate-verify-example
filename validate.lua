@@ -30,29 +30,6 @@ typedef xmlSchemaValidCtxt *xmlSchemaValidCtxtPtr;
 /* XMLPUBFUN */ xmlSchemaParserCtxtPtr /* XMLCALL */
 	    xmlSchemaNewParserCtxt	(const char *URL);
 
-typedef void (/* XMLCDECL */ *xmlGenericErrorFunc) (void *ctx,
-				 const char *msg,
-				 ...) /* LIBXML_ATTR_FORMAT(2,3) */;
-
-/* XMLPUBFUN */ xmlGenericErrorFunc * /* XMLCALL */ __xmlGenericError(void);
-// #ifdef LIBXML_THREAD_ENABLED
-// #define xmlGenericError \
-// (*(__xmlGenericError()))
-// #else
-// XMLPUBVAR xmlGenericErrorFunc xmlGenericError;
-// #endif
-
-typedef void (/* XMLCDECL */ *xmlSchemaValidityErrorFunc)
-                 (void *ctx, const char *msg, ...) /* LIBXML_ATTR_FORMAT(2,3) */;
-typedef void (/* XMLCDECL */ *xmlSchemaValidityWarningFunc)
-                 (void *ctx, const char *msg, ...) /* LIBXML_ATTR_FORMAT(2,3) */;
-
-/* XMLPUBFUN */ void /* XMLCALL */
-	    xmlSchemaSetParserErrors	(xmlSchemaParserCtxtPtr ctxt,
-					 xmlSchemaValidityErrorFunc err,
-					 xmlSchemaValidityWarningFunc warn,
-					 void *ctx);
-
 typedef struct _xmlSchema xmlSchema;
 typedef xmlSchema *xmlSchemaPtr;
 
@@ -63,12 +40,6 @@ typedef xmlSchema *xmlSchemaPtr;
 	    xmlSchemaNewValidCtxt	(xmlSchemaPtr schema);
 /* XMLPUBFUN */ void /* XMLCALL */
 	    xmlSchemaFreeValidCtxt	(xmlSchemaValidCtxtPtr ctxt);
-
-/* XMLPUBFUN */ void /* XMLCALL */
-	    xmlSchemaSetValidErrors	(xmlSchemaValidCtxtPtr ctxt,
-					 xmlSchemaValidityErrorFunc err,
-					 xmlSchemaValidityWarningFunc warn,
-					 void *ctx);
 
 /* XMLPUBFUN */ void /* XMLCALL */
             xmlSchemaValidateSetFilename(xmlSchemaValidCtxtPtr vctxt,
@@ -89,8 +60,6 @@ end
 
 local schema = 'saml-schema-protocol-2.0.xsd'
 local ctxt = xml2.xmlSchemaNewParserCtxt(schema)
-local xmlGenericError = xml2.__xmlGenericError()[0]
-xml2.xmlSchemaSetParserErrors(ctxt, xmlGenericError, xmlGenericError, nil)
 local wxschemas = xml2.xmlSchemaParse(ctxt)
 if wxschemas == nil then
     print('failed to parse schema')
@@ -98,7 +67,6 @@ if wxschemas == nil then
 end
 
 local vctxt = xml2.xmlSchemaNewValidCtxt(wxschemas)
-xml2.xmlSchemaSetValidErrors(vctxt, xmlGenericError, xmlGenericError, nil)
 local filename = 'res-signed.xml'
 xml2.xmlSchemaValidateSetFilename(vctxt, filename)
 local data = readfile(filename)
