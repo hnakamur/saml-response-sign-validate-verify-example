@@ -1,6 +1,7 @@
 #!/usr/bin/env luajit
 
 local ffi = require('ffi')
+local C = ffi.C
 local xml2 = ffi.load('xml2')
 
 ffi.cdef[[
@@ -23,6 +24,7 @@ int isspace(int c);
  ******************************************************************************/
 
 size_t strlen(const char *s);
+char *basename(const char *filename);
 
 
 /******************************************************************************
@@ -262,7 +264,7 @@ local function xsdMatch(filename)
 end
 
 local function xsdOpen(filename)
-    local filename_s = ffi.string(filename)
+    local filename_s = ffi.string(C.basename(filename))
     local data = xsdFiles[filename_s]
     if data == nil then
         return nil
