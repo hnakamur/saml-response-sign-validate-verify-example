@@ -5,6 +5,12 @@ local xml2 = ffi.load('xml2')
 
 ffi.cdef[[
 
+typedef struct {
+    const char *data;
+    int len;
+    int pos;
+} xsdReadContext, *xsdReadContextPtr;
+
 /******************************************************************************
  * ctype.h
  ******************************************************************************/
@@ -100,6 +106,56 @@ typedef void (/* XMLCALL */ *xmlStructuredErrorFunc) (void *userData, xmlErrorPt
  * xmlschemas.h
  ******************************************************************************/
 
+/**
+ * xmlInputMatchCallback:
+ * @filename: the filename or URI
+ *
+ * Callback used in the I/O Input API to detect if the current handler
+ * can provide input fonctionnalities for this resource.
+ *
+ * Returns 1 if yes and 0 if another Input module should be used
+ */
+typedef int (/* XMLCALL */ *xmlInputMatchCallback) (char const *filename);
+/**
+ * xmlInputOpenCallback:
+ * @filename: the filename or URI
+ *
+ * Callback used in the I/O Input API to open the resource
+ *
+ * Returns an Input context or NULL in case or error
+ */
+typedef void * (/* XMLCALL */ *xmlInputOpenCallback) (char const *filename);
+/**
+ * xmlInputReadCallback:
+ * @context:  an Input context
+ * @buffer:  the buffer to store data read
+ * @len:  the length of the buffer in bytes
+ *
+ * Callback used in the I/O Input API to read the resource
+ *
+ * Returns the number of bytes read or -1 in case of error
+ */
+typedef int (/* XMLCALL */ *xmlInputReadCallback) (void * context, char * buffer, int len);
+/**
+ * xmlInputCloseCallback:
+ * @context:  an Input context
+ *
+ * Callback used in the I/O Input API to close the resource
+ *
+ * Returns 0 or -1 in case of error
+ */
+typedef int (/* XMLCALL */ *xmlInputCloseCallback) (void * context);
+
+/* XMLPUBFUN */ int /* XMLCALL */
+	xmlRegisterInputCallbacks		(xmlInputMatchCallback matchFunc,
+						 xmlInputOpenCallback openFunc,
+						 xmlInputReadCallback readFunc,
+						 xmlInputCloseCallback closeFunc);
+
+/******************************************************************************
+ * xmlschemas.h
+ ******************************************************************************/
+
 typedef struct _xmlSchemaParserCtxt xmlSchemaParserCtxt;
 typedef xmlSchemaParserCtxt *xmlSchemaParserCtxtPtr;
 
@@ -185,6 +241,67 @@ local function globalParseError(userData, err)
 end
 xml2.xmlSetStructuredErrorFunc(nil, globalParseError)
 
+local function has_suffix(s, suffix)
+    return #s >= #suffix and string.sub(s, -#suffix) == suffix
+end
+
+local xsdFiles = {}
+local function loadXsdFiles(filenames)
+    for _, filename in ipairs(filenames) do
+        xsdFiles[filename] = readfile(filename)
+    end
+end
+
+local function xsdMatch(filename)
+    local filename_s = ffi.string(filename)
+    if has_suffix(filename_s, '.xsd') then
+        -- print('xsdMatch, filename=', filename_s, ', returns 1')
+        return 1
+    end
+    return 0
+end
+
+local function xsdOpen(filename)
+    local filename_s = ffi.string(filename)
+    local data = xsdFiles[filename_s]
+    if data == nil then
+        return nil
+    end
+    local context = ffi.new('xsdReadContext[1]')
+    context[0].data = data
+    context[0].len = #data
+    context[0].pos = 0
+    return context
+end
+
+local function xsdRead(context, buffer, len)
+    if context == nil then
+        return -1
+    end
+    local ctx = ffi.cast('xsdReadContextPtr', context)
+    local to_copy = ctx.len - ctx.pos
+    if to_copy >= len then
+        to_copy = len
+    end
+    -- print('xsdRead, pos=', ctx.pos, ', to_copy=', to_copy, ', len=', len, ', ctx.len=', ctx.len)
+    ffi.copy(buffer, ctx.data + ctx.pos, to_copy)
+    ctx.pos = ctx.pos + to_copy
+    return to_copy
+end
+
+local  function xsdClose(context)
+    return 0
+end
+
+if xml2.xmlRegisterInputCallbacks(xsdMatch, xsdOpen, xsdRead, xsdClose) ~= 0 then
+    print('error in xmlRegisterInputCallbacks')
+end
+loadXsdFiles{
+    'saml-schema-assertion-2.0.xsd',
+    'saml-schema-protocol-2.0.xsd',
+    'xenc-schema.xsd',
+    'xmldsig-core-schema.xsd',
+}
 local schema = 'saml-schema-protocol-2.0.xsd'
 local ctxt = xml2.xmlSchemaNewParserCtxt(schema)
 local parseErrMsg
